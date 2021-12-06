@@ -4,6 +4,12 @@
 // extract from chromium source code by @liuwayong
 (function () {
     'use strict';
+
+    let hackControl = {
+	obstacleStart: _ => 0,
+	xDeltaSign: -1,
+	horizonSign: -1
+    }
     /**
      * T-Rex runner.
      * @param {string} outerContainerId Outer containing element id.
@@ -376,7 +382,7 @@
                 this.spriteDef.TEXT_SPRITE, this.dimensions.WIDTH);
 
             // Draw t-rex
-            this.tRex = new Trex(this.canvas, this.spriteDef.TREX);
+            this.tRex = new Trex(this.canvas, this.spriteDef.TREX, this.dimensions);
 
             this.outerContainerEl.appendChild(this.containerEl);
 
@@ -553,7 +559,7 @@
 
                 // Check for collisions.
                 var collision = hasObstacles &&
-                    checkForCollision(this.horizon.obstacles[0], this.tRex);
+                    this.horizon.obstacles.some(o => checkForCollision(o, this.tRex/*, this.canvasCtx*/));
 
                 if (!collision) {
                     this.distanceRan += this.currentSpeed * deltaTime / this.msPerFrame;
@@ -1249,7 +1255,7 @@
         this.size = getRandomNum(1, Obstacle.MAX_OBSTACLE_LENGTH);
         this.dimensions = dimensions;
         this.remove = false;
-        this.xPos = dimensions.WIDTH + (opt_xOffset || 0);
+        this.xPos = hackControl.obstacleStart(dimensions); //+ (opt_xOffset || 0);
         this.yPos = 0;
         this.width = 0;
         this.collisionBoxes = [];
@@ -1363,7 +1369,7 @@
                     if (this.typeConfig.speedOffset) {
                         speed += this.speedOffset;
                     }
-                    this.xPos -= Math.floor((speed * FPS / 1000) * deltaTime);
+                    this.xPos -= hackControl.xDeltaSign * Math.floor((speed * FPS / 1000) * deltaTime);
 
                     // Update frame
                     if (this.typeConfig.numFrames) {
@@ -1402,7 +1408,7 @@
              * @return {boolean} Whether the obstacle is in the game area.
              */
             isVisible: function () {
-                return this.xPos + this.width > 0;
+                return this.xPos + this.width > 0 && this.xPos <= this.dimensions.WIDTH;
             },
 
             /**
@@ -1487,11 +1493,12 @@
      * @param {Object} spritePos Positioning within image sprite.
      * @constructor
      */
-    function Trex(canvas, spritePos) {
+    function Trex(canvas, spritePos, dimensions) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.spritePos = spritePos;
-        this.xPos = 0;
+	this.dimensions = dimensions;
+        this.xPos = dimensions.WIDTH/2 - Trex.config.WIDTH/2;
         this.yPos = 0;
         // Position when on the ground.
         this.groundYPos = 0;
@@ -1533,7 +1540,7 @@
         MIN_JUMP_HEIGHT: 30,
         SPEED_DROP_COEFFICIENT: 3,
         SPRITE_WIDTH: 262,
-        START_X_POS: 50,
+        START_X_POS: 0,
         WIDTH: 44,
         WIDTH_DUCK: 59
     };
@@ -1699,6 +1706,12 @@
             sourceX += this.spritePos.x;
             sourceY += this.spritePos.y;
 
+	   this.canvasCtx.save()
+	   if (hackControl.horizonSign == -1) {
+	   	this.canvasCtx.scale(-1, 1);
+           	this.canvasCtx.translate(-this.dimensions.WIDTH, 0);
+	   }
+
             // Ducking.
             if (this.ducking && this.status != Trex.status.CRASHED) {
                 this.canvasCtx.drawImage(Runner.imageSprite, sourceX, sourceY,
@@ -1716,6 +1729,7 @@
                     this.xPos, this.yPos,
                     this.config.WIDTH, this.config.HEIGHT);
             }
+	    this.canvasCtx.restore()
         },
 
         /**
@@ -2169,7 +2183,7 @@
             this.canvasCtx.drawImage(Runner.imageSprite, this.spritePos.x,
                 this.spritePos.y,
                 sourceWidth, sourceHeight,
-                this.xPos, this.yPos,
+                hackControl.horizonSign == -1 ? this.containerWidth - this.xPos : this.xPos, this.yPos,
                 Cloud.config.WIDTH, Cloud.config.HEIGHT);
 
             this.canvasCtx.restore();
@@ -2431,13 +2445,13 @@
             this.canvasCtx.drawImage(Runner.imageSprite, this.sourceXPos[0],
                 this.spritePos.y,
                 this.sourceDimensions.WIDTH, this.sourceDimensions.HEIGHT,
-                this.xPos[0], this.yPos,
+                hackControl.horizonSign* this.xPos[0], this.yPos,
                 this.dimensions.WIDTH, this.dimensions.HEIGHT);
 
             this.canvasCtx.drawImage(Runner.imageSprite, this.sourceXPos[1],
                 this.spritePos.y,
                 this.sourceDimensions.WIDTH, this.sourceDimensions.HEIGHT,
-                this.xPos[1], this.yPos,
+                hackControl.horizonSign*this.xPos[1], this.yPos,
                 this.dimensions.WIDTH, this.dimensions.HEIGHT);
         },
 
@@ -2450,7 +2464,9 @@
             var line1 = pos;
             var line2 = pos == 0 ? 1 : 0;
 
+		
             this.xPos[line1] -= increment;
+
             this.xPos[line2] = this.xPos[line1] + this.dimensions.WIDTH;
 
             if (this.xPos[line1] <= -this.dimensions.WIDTH) {
@@ -2467,7 +2483,6 @@
          */
         update: function (deltaTime, speed) {
             var increment = Math.floor(speed * (FPS / 1000) * deltaTime);
-
             if (this.xPos[0] <= 0) {
                 this.updateXPos(0, increment);
             } else {
@@ -2620,7 +2635,7 @@
                 if (lastObstacle && !lastObstacle.followingObstacleCreated &&
                     lastObstacle.isVisible() &&
                     (lastObstacle.xPos + lastObstacle.width + lastObstacle.gap) <
-                    this.dimensions.WIDTH) {
+                	hackControl.obstacleStart(this.dimensions)) {
                     this.addNewObstacle(currentSpeed);
                     lastObstacle.followingObstacleCreated = true;
                 }
@@ -2639,6 +2654,7 @@
          * @param {number} currentSpeed
          */
         addNewObstacle: function (currentSpeed) {
+	    console.log('hi');
             var obstacleTypeIndex = getRandomNum(0, Obstacle.types.length - 1);
             var obstacleType = Obstacle.types[obstacleTypeIndex];
 
