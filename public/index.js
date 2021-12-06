@@ -784,14 +784,14 @@ var hackvariant = Math.random() < 0.5;
 
             this.tRex.update(100, Trex.status.CRASHED);
 
+	const logD = {timestamp: new Date(), score: this.distanceRan, variant: hackvariant, width: this.canvas.width, height: this.canvas.height}
+	 db.collection('user').doc(auth.currentUser.uid).update({"score": firebase.firestore.FieldValue.arrayUnion(logD)}).then(function () {console.log('Recorded ' + JSON.stringify(logD))}).catch(function (e) {console.error(e)})
             // Game over panel.
             if (!this.gameOverPanel) {
                 this.gameOverPanel = new GameOverPanel(this.canvas,
                     this.spriteDef.TEXT_SPRITE, this.spriteDef.RESTART,
                     this.dimensions);
 
-		    const logD = {timestamp: new Date(), score: this.distanceRan, variant: hackvariant}
-		    db.collection('user').doc(auth.currentUser.uid).update({"score": firebase.firestore.FieldValue.arrayUnion(logD)}).then(function () {console.log('Recorded ' + JSON.stringify(logD))}).catch(function (e) {console.error(e)})
 		    //hackvariant = Math.random() < 0.5;
             } else {
                 this.gameOverPanel.draw();
@@ -2732,8 +2732,3 @@ function onDocumentLoad() {
 
 document.addEventListener('DOMContentLoaded', onDocumentLoad);
 
-firebase.auth().signInAnonymously().then(function (result) {
-	console.log("Logged in with ", result.user.uid)
-}).catch(function (error) {
-	console.error("can not log in", error);
-});
