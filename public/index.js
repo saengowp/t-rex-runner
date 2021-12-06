@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 // extract from chromium source code by @liuwayong
+var hackvariant = Math.random() < 0.5;
+
 (function () {
     'use strict';
 
-    let hackControl = {
-	obstacleStart: _ => 0,
-	xDeltaSign: -1,
-	horizonSign: -1
-    }
+    
+
     /**
      * T-Rex runner.
      * @param {string} outerContainerId Outer containing element id.
@@ -790,6 +789,10 @@
                 this.gameOverPanel = new GameOverPanel(this.canvas,
                     this.spriteDef.TEXT_SPRITE, this.spriteDef.RESTART,
                     this.dimensions);
+
+		    const logD = {timestamp: new Date(), score: this.distanceRan, variant: hackvariant}
+		    db.collection('user').doc(auth.currentUser.uid).update({"score": firebase.firestore.FieldValue.arrayUnion(logD)}).then(function () {console.log('Recorded ' + JSON.stringify(logD))}).catch(function (e) {console.error(e)})
+		    //hackvariant = Math.random() < 0.5;
             } else {
                 this.gameOverPanel.draw();
             }
@@ -1255,7 +1258,7 @@
         this.size = getRandomNum(1, Obstacle.MAX_OBSTACLE_LENGTH);
         this.dimensions = dimensions;
         this.remove = false;
-        this.xPos = hackControl.obstacleStart(dimensions); //+ (opt_xOffset || 0);
+        this.xPos = hackvariant ? 0:dimensions.WIDTH; //+ (opt_xOffset || 0);
         this.yPos = 0;
         this.width = 0;
         this.collisionBoxes = [];
@@ -1369,7 +1372,7 @@
                     if (this.typeConfig.speedOffset) {
                         speed += this.speedOffset;
                     }
-                    this.xPos -= hackControl.xDeltaSign * Math.floor((speed * FPS / 1000) * deltaTime);
+                    this.xPos -= (hackvariant ? -1 : 1) * Math.floor((speed * FPS / 1000) * deltaTime);
 
                     // Update frame
                     if (this.typeConfig.numFrames) {
@@ -1707,7 +1710,7 @@
             sourceY += this.spritePos.y;
 
 	   this.canvasCtx.save()
-	   if (hackControl.horizonSign == -1) {
+	   if (hackvariant) {
 	   	this.canvasCtx.scale(-1, 1);
            	this.canvasCtx.translate(-this.dimensions.WIDTH, 0);
 	   }
@@ -2183,7 +2186,7 @@
             this.canvasCtx.drawImage(Runner.imageSprite, this.spritePos.x,
                 this.spritePos.y,
                 sourceWidth, sourceHeight,
-                hackControl.horizonSign == -1 ? this.containerWidth - this.xPos : this.xPos, this.yPos,
+                hackvariant ? this.containerWidth - this.xPos : this.xPos, this.yPos,
                 Cloud.config.WIDTH, Cloud.config.HEIGHT);
 
             this.canvasCtx.restore();
@@ -2445,13 +2448,13 @@
             this.canvasCtx.drawImage(Runner.imageSprite, this.sourceXPos[0],
                 this.spritePos.y,
                 this.sourceDimensions.WIDTH, this.sourceDimensions.HEIGHT,
-                hackControl.horizonSign* this.xPos[0], this.yPos,
+                (hackvariant ? -1 : 1) * this.xPos[0], this.yPos,
                 this.dimensions.WIDTH, this.dimensions.HEIGHT);
 
             this.canvasCtx.drawImage(Runner.imageSprite, this.sourceXPos[1],
                 this.spritePos.y,
                 this.sourceDimensions.WIDTH, this.sourceDimensions.HEIGHT,
-                hackControl.horizonSign*this.xPos[1], this.yPos,
+                (hackvariant ? -1 : 1)*this.xPos[1], this.yPos,
                 this.dimensions.WIDTH, this.dimensions.HEIGHT);
         },
 
@@ -2634,8 +2637,7 @@
 
                 if (lastObstacle && !lastObstacle.followingObstacleCreated &&
                     lastObstacle.isVisible() &&
-                    (lastObstacle.xPos + lastObstacle.width + lastObstacle.gap) <
-                	hackControl.obstacleStart(this.dimensions)) {
+                    (hackvariant? (lastObstacle.xPos > lastObstacle.gap) : (lastObstacle.xPos + lastObstacle.width + lastObstacle.gap) < this.dimensions.WIDTH)) {
                     this.addNewObstacle(currentSpeed);
                     lastObstacle.followingObstacleCreated = true;
                 }
@@ -2654,7 +2656,6 @@
          * @param {number} currentSpeed
          */
         addNewObstacle: function (currentSpeed) {
-	    console.log('hi');
             var obstacleTypeIndex = getRandomNum(0, Obstacle.types.length - 1);
             var obstacleType = Obstacle.types[obstacleTypeIndex];
 
@@ -2666,6 +2667,7 @@
             } else {
                 var obstacleSpritePos = this.spritePos[obstacleType.type];
 
+		    console.log("Added new obstacle");
                 this.obstacles.push(new Obstacle(this.canvasCtx, obstacleType,
                     obstacleSpritePos, this.dimensions,
                     this.gapCoefficient, currentSpeed, obstacleType.width));
@@ -2729,3 +2731,9 @@ function onDocumentLoad() {
 }
 
 document.addEventListener('DOMContentLoaded', onDocumentLoad);
+
+firebase.auth().signInAnonymously().then(function (result) {
+	console.log("Logged in with ", result.user.uid)
+}).catch(function (error) {
+	console.error("can not log in", error);
+});
